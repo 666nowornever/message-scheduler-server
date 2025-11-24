@@ -49,13 +49,44 @@ app.get('/api/calendar', (req, res) => {
   });
 });
 
-app.post('/api/calendar', (req, res) => {
-  console.log('📅 POST /api/calendar - Данные:', Object.keys(req.body));
+app.post('/api/messages', (req, res) => {
+  console.log('📨 POST /api/messages - Новое сообщение:', {
+    userId: req.body.userId,
+    message: req.body.message?.substring(0, 100),
+    scheduledFor: new Date(req.body.scheduledFor).toLocaleString('ru-RU'),
+    eventType: req.body.eventData?.type,
+    chatId: req.body.chatId
+  });
+  
+  const messageId = 'msg_' + Date.now();
+  
+  // Сохраняем сообщение
+  const message = {
+    id: messageId,
+    ...req.body,
+    status: 'scheduled',
+    createdAt: new Date().toISOString(),
+    attempts: 0
+  };
+  
+  messageStore.set(messageId, message);
+  
+  console.log('✅ Сообщение сохранено с ID:', messageId);
+  console.log(`📊 Всего сообщений: ${messageStore.size}`);
+  
+  // Немедленно проверяем, не пора ли отправить
+  setTimeout(() => {
+    const now = new Date();
+    const message = messageStore.get(messageId);
+    if (message && message.status === 'scheduled' && new Date(message.scheduledFor) <= now) {
+      console.log('🚀 Немедленная отправка сообщения...');
+      TelegramService.sendMessage(message.chatId, message.message);
+    }
+  }, 2000);
+  
   res.json({
     success: true,
-    message: 'Calendar data saved',
-    lastModified: Date.now(),
-    version: 1
+    message: message
   });
 });
 
@@ -122,7 +153,93 @@ app.delete('/api/messages/:messageId', (req, res) => {
     message: 'Message deleted'
   });
 });
+const axios = require('axios');
+app.get('/api/debug/all-messages', (req, res) => {
+  const messages = Array.from(messageStore.values());
+  
+  console.log(`🔍 Просмотр всех сообщений: ${messages.length}`);
+  
+  res.json({
+    success: true,
+    total: messages.length,
+    messages: messages.map(msg => ({
+      id: msg.id,
+      message: msg.message,
+      scheduledFor: new Date(msg.scheduledFor).toLocaleString('ru-RU'),
+      status: msg.status,
+      chatId: msg.chatId,
+      eventType: msg.eventData?.type,
+      createdAt: new Date(msg.createdAt).toLocaleString('ru-RU'),
+      sentAt: msg.sentAt ? new Date(msg.sentAt).toLocaleString('ru-RU') : null,
+      error: msg.error
+    }))
+  });
+});
+// Telegram service
+const TelegramService = {
+  botToken: process.env.TELEGRAM_BOT_TOKEN,
+  
+  async sendMessage(chatId, message) {
+    if (!this.botToken) {
+      console.error('❌ TELEGRAM_BOT_TOKEN не настроен');
+      return { success: false, error: 'Bot token not configured' };
+    }
+    
+    try {
+      console.log(`🤖 Отправка в чат ${chatId}: ${message.substring(0, 50)}...`);
+      
+      const response = await axios.post(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML'
+      }, {
+        timeout: 10000
+      });
+      
+      console.log('✅ Сообщение отправлено');
+      return { success: true, messageId: response.data.result.message_id };
+    } catch (error) {
+      console.error('❌ Ошибка отправки:', error.response?.data || error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.description || error.message 
+      };
+    }
+  }
+};
 
+// Хранилище сообщений (временно, вместо БД)
+const messageStore = new Map();
+
+// Проверка сообщений каждую минуту
+setInterval(async () => {
+  console.log('🔍 Проверка сообщений для отправки...');
+  const now = new Date();
+  let sentCount = 0;
+  
+  for (const [id, message] of messageStore) {
+    if (message.status === 'scheduled' && new Date(message.scheduledFor) <= now) {
+      console.log(`📤 Отправка сообщения ${id}: ${message.message.substring(0, 50)}...`);
+      
+      const result = await TelegramService.sendMessage(message.chatId, message.message);
+      
+      if (result.success) {
+        message.status = 'sent';
+        message.sentAt = new Date();
+        sentCount++;
+        console.log(`✅ Сообщение ${id} отправлено`);
+      } else {
+        message.status = 'error';
+        message.error = result.error;
+        console.error(`❌ Ошибка отправки ${id}:`, result.error);
+      }
+    }
+  }
+  
+  if (sentCount > 0) {
+    console.log(`🎉 Отправлено сообщений: ${sentCount}`);
+  }
+}, 60000); // Каждую минуту
 // ===== DEBUG ENDPOINTS =====
 app.get('/api/debug/messages', (req, res) => {
   console.log('🔍 GET /api/debug/messages');
