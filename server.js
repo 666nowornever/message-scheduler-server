@@ -222,7 +222,52 @@ const TelegramService = {
 
 // Хранилище сообщений (временно, вместо БД)
 const messageStore = new Map();
-
+const TelegramService = {
+  botToken: process.env.TELEGRAM_BOT_TOKEN,
+  
+  async sendMessage(chatId, message) {
+    console.log(`🤖 Попытка отправки в чат ${chatId}: ${message.substring(0, 50)}...`);
+    
+    if (!this.botToken) {
+      console.error('❌ TELEGRAM_BOT_TOKEN не настроен!');
+      console.log('💡 Добавь в Environment Variables на Render.com:');
+      console.log('   TELEGRAM_BOT_TOKEN=123456:ABC-DEF...');
+      return { success: false, error: 'Bot token not configured' };
+    }
+    
+    if (!chatId) {
+      console.error('❌ Chat ID не указан!');
+      return { success: false, error: 'Chat ID not provided' };
+    }
+    
+    try {
+      console.log(`📡 Отправка запроса к Telegram API...`);
+      
+      const response = await axios.post(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML'
+      }, {
+        timeout: 10000
+      });
+      
+      console.log('✅ Сообщение отправлено успешно!');
+      console.log('📨 Message ID:', response.data.result.message_id);
+      return { success: true, messageId: response.data.result.message_id };
+      
+    } catch (error) {
+      console.error('❌ Ошибка отправки в Telegram:');
+      console.error('   Status:', error.response?.status);
+      console.error('   Error:', error.response?.data?.description || error.message);
+      console.error('   Chat ID:', chatId);
+      
+      return { 
+        success: false, 
+        error: error.response?.data?.description || error.message 
+      };
+    }
+  }
+};
 // Проверка сообщений каждую минуту
 // В функции проверки сообщений добавь коррекцию времени
 setInterval(async () => {
