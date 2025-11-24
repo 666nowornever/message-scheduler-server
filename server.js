@@ -13,7 +13,17 @@ app.use(express.json());
 
 // Инициализация базы данных
 const db = require('./database/database');
+await db.connect();
+console.log('✅ Database initialized');
 
+// Проверяем доступность Telegram бота
+const telegramService = require('./services/telegramService');
+const botAvailable = await telegramService.checkBotAvailability();
+if (!botAvailable) {
+  console.warn('⚠️ Telegram bot is not available. Message sending will fail.');
+} else {
+  console.log('✅ Telegram bot is ready');
+}
 // Routes
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/calendar', require('./routes/calendar'));
