@@ -1,7 +1,7 @@
 {
   "name": "message-scheduler-server",
   "version": "1.0.0",
-  "description": "Server for Telegram message scheduling and calendar sync",
+  "description": "Server for Telegram message scheduling",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -16,7 +16,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1"
   },
-  "engines": {
-    "node": ">=16.0.0"
-  }
+  "keywords": ["telegram", "scheduler", "calendar"],
+  "author": "Your Name",
+  "license": "MIT"
 }

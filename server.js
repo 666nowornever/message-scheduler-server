@@ -1,8 +1,6 @@
 const express = require('express');
-const WebSocket = require('ws');
 const cors = require('cors');
 const path = require('path');
-require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,82 +9,91 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Инициализация базы данных
-const db = require('./database/database');
-await db.connect();
-console.log('✅ Database initialized');
-
-// Проверяем доступность Telegram бота
-const telegramService = require('./services/telegramService');
-const botAvailable = await telegramService.checkBotAvailability();
-if (!botAvailable) {
-  console.warn('⚠️ Telegram bot is not available. Message sending will fail.');
-} else {
-  console.log('✅ Telegram bot is ready');
-}
-// Routes
-app.use('/api/messages', require('./routes/messages'));
-app.use('/api/calendar', require('./routes/calendar'));
-
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    service: 'Message Scheduler Server'
+  });
 });
 
-// WebSocket server
-const wss = new WebSocket.Server({ noServer: true });
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Message Scheduler Server is running!',
+    endpoints: [
+      'GET  /health',
+      'GET  /api/calendar',
+      'POST /api/calendar',
+      'GET  /api/messages/:userId',
+      'POST /api/messages',
+      'DELETE /api/messages/:messageId'
+    ]
+  });
+});
 
-wss.on('connection', (ws) => {
-  console.log('🔗 WebSocket client connected');
-  
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      console.log('📨 WebSocket message:', data.type);
-    } catch (error) {
-      console.error('❌ WebSocket parse error:', error);
+// Mock API routes (временно, пока не настроена БД)
+app.get('/api/calendar', (req, res) => {
+  console.log('📅 GET /api/calendar');
+  res.json({
+    success: true,
+    data: {
+      events: {},
+      vacations: {},
+      lastModified: Date.now(),
+      version: 1
     }
   });
+});
 
-  ws.on('close', () => {
-    console.log('🔌 WebSocket client disconnected');
+app.post('/api/calendar', (req, res) => {
+  console.log('📅 POST /api/calendar');
+  res.json({
+    success: true,
+    message: 'Calendar data saved (mock)',
+    lastModified: Date.now(),
+    version: 1
   });
 });
 
-// Инициализация и запуск сервера
-async function startServer() {
-  try {
-    // Инициализируем базу данных
-    await db.connect();
-    console.log('✅ Database initialized');
+app.get('/api/messages/:userId', (req, res) => {
+  console.log('📨 GET /api/messages/', req.params.userId);
+  res.json({
+    success: true,
+    messages: []
+  });
+});
 
-    // Запускаем планировщик
-    require('./services/schedulerService').start();
-    console.log('✅ Scheduler started');
+app.post('/api/messages', (req, res) => {
+  console.log('📨 POST /api/messages', {
+    message: req.body.message?.substring(0, 50),
+    scheduledFor: req.body.scheduledFor
+  });
+  
+  res.json({
+    success: true,
+    message: { 
+      id: 'msg_' + Date.now(),
+      ...req.body,
+      status: 'scheduled'
+    }
+  });
+});
 
-    // Запускаем сервер
-    const server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-    });
+app.delete('/api/messages/:messageId', (req, res) => {
+  console.log('🗑️ DELETE /api/messages/', req.params.messageId);
+  res.json({ success: true });
+});
 
-    // WebSocket upgrade
-    server.on('upgrade', (request, socket, head) => {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
-    });
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Local: http://localhost:${PORT}`);
+  console.log(`🔗 Health: http://localhost:${PORT}/health`);
+});
 
-  } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
-  }
-}
-
-// Запуск сервера
-startServer();
-
-// Обработка ошибок
+// Error handling
 process.on('unhandledRejection', (err) => {
   console.error('❌ Unhandled Promise Rejection:', err);
 });
