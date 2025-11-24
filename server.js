@@ -192,40 +192,6 @@ const TelegramService = {
   botToken: process.env.TELEGRAM_BOT_TOKEN,
   
   async sendMessage(chatId, message) {
-    if (!this.botToken) {
-      console.error('❌ TELEGRAM_BOT_TOKEN не настроен');
-      return { success: false, error: 'Bot token not configured' };
-    }
-    
-    try {
-      console.log(`🤖 Отправка в чат ${chatId}: ${message.substring(0, 50)}...`);
-      
-      const response = await axios.post(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'HTML'
-      }, {
-        timeout: 10000
-      });
-      
-      console.log('✅ Сообщение отправлено');
-      return { success: true, messageId: response.data.result.message_id };
-    } catch (error) {
-      console.error('❌ Ошибка отправки:', error.response?.data || error.message);
-      return { 
-        success: false, 
-        error: error.response?.data?.description || error.message 
-      };
-    }
-  }
-};
-
-// Хранилище сообщений (временно, вместо БД)
-const messageStore = new Map();
-const TelegramService = {
-  botToken: process.env.TELEGRAM_BOT_TOKEN,
-  
-  async sendMessage(chatId, message) {
     console.log(`🤖 Попытка отправки в чат ${chatId}: ${message.substring(0, 50)}...`);
     
     if (!this.botToken) {
@@ -268,6 +234,10 @@ const TelegramService = {
     }
   }
 };
+
+// Хранилище сообщений (временно, вместо БД)
+const messageStore = new Map();
+
 // Проверка сообщений каждую минуту
 // В функции проверки сообщений добавь коррекцию времени
 setInterval(async () => {
