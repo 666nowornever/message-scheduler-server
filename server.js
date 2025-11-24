@@ -175,6 +175,18 @@ app.get('/api/debug/all-messages', (req, res) => {
     }))
   });
 });
+app.get('/api/debug/time', (req, res) => {
+    const now = new Date();
+    res.json({
+        serverTime: {
+            utc: now.toUTCString(),
+            iso: now.toISOString(),
+            local: now.toLocaleString('ru-RU'),
+            timestamp: now.getTime(),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+    });
+});
 // Telegram service
 const TelegramService = {
   botToken: process.env.TELEGRAM_BOT_TOKEN,
@@ -212,34 +224,26 @@ const TelegramService = {
 const messageStore = new Map();
 
 // Проверка сообщений каждую минуту
+// В функции проверки сообщений добавь коррекцию времени
 setInterval(async () => {
   console.log('🔍 Проверка сообщений для отправки...');
   const now = new Date();
-  let sentCount = 0;
+  
+  // Коррекция для MSK времени (+3 часа)
+  const nowMSK = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+  
+  console.log('⏰ Текущее время UTC:', now.toLocaleString('ru-RU'));
+  console.log('⏰ Текущее время MSK:', nowMSK.toLocaleString('ru-RU'));
   
   for (const [id, message] of messageStore) {
-    if (message.status === 'scheduled' && new Date(message.scheduledFor) <= now) {
-      console.log(`📤 Отправка сообщения ${id}: ${message.message.substring(0, 50)}...`);
-      
-      const result = await TelegramService.sendMessage(message.chatId, message.message);
-      
-      if (result.success) {
-        message.status = 'sent';
-        message.sentAt = new Date();
-        sentCount++;
-        console.log(`✅ Сообщение ${id} отправлено`);
-      } else {
-        message.status = 'error';
-        message.error = result.error;
-        console.error(`❌ Ошибка отправки ${id}:`, result.error);
-      }
+    const scheduledTime = new Date(message.scheduledFor);
+    
+    if (message.status === 'scheduled' && scheduledTime <= nowMSK) {
+      console.log(`📤 Отправка сообщения ${id}...`);
+      // ... отправка
     }
   }
-  
-  if (sentCount > 0) {
-    console.log(`🎉 Отправлено сообщений: ${sentCount}`);
-  }
-}, 60000); // Каждую минуту
+}, 60000);
 // ===== DEBUG ENDPOINTS =====
 app.get('/api/debug/messages', (req, res) => {
   console.log('🔍 GET /api/debug/messages');
