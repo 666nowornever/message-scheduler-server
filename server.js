@@ -18,6 +18,7 @@ db.connect().then(() => {
 
 // Routes
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/calendar', require('./routes/calendar'));
 
 // WebSocket server
 const wss = new WebSocket.Server({ noServer: true });
