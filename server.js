@@ -294,7 +294,35 @@ app.get('/api/debug/messages', (req, res) => {
     }))
   });
 });
-
+app.get('/api/debug/bot-status', async (req, res) => {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  
+  const status = {
+    botToken: botToken ? '✅ Настроен' : '❌ Не настроен',
+    hasChatId: true, // предполагаем что есть
+    environment: process.env.NODE_ENV || 'development'
+  };
+  
+  if (botToken) {
+    try {
+      const response = await axios.get(`https://api.telegram.org/bot${botToken}/getMe`, {
+        timeout: 5000
+      });
+      status.botInfo = {
+        username: response.data.result.username,
+        name: response.data.result.first_name,
+        status: '✅ Активен'
+      };
+    } catch (error) {
+      status.botInfo = {
+        status: '❌ Не доступен',
+        error: error.response?.data?.description || error.message
+      };
+    }
+  }
+  
+  res.json(status);
+});
 // ===== START SERVER =====
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
