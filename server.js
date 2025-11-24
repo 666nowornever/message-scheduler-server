@@ -1,5 +1,4 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const WebSocket = require('ws');
 const cors = require('cors');
 require('dotenv').config();
@@ -11,34 +10,20 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Initialize database
+const db = require('./database/database');
+db.connect().then(() => {
+  console.log('✅ Database initialized');
+}).catch(console.error);
+
 // Routes
 app.use('/api/messages', require('./routes/messages'));
-app.use('/api/webhook', require('./routes/webhook'));
-
-// MongoDB connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/message_scheduler', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
 
 // WebSocket server
 const wss = new WebSocket.Server({ noServer: true });
-
 wss.on('connection', (ws) => {
   console.log('🔗 WebSocket client connected');
-  
-  ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      console.log('📨 WebSocket message:', data);
-    } catch (error) {
-      console.error('❌ WebSocket parse error:', error);
-    }
-  });
-
-  ws.on('close', () => {
-    console.log('🔌 WebSocket client disconnected');
-  });
+  ws.on('close', () => console.log('🔌 WebSocket client disconnected'));
 });
 
 // Start server
@@ -53,5 +38,5 @@ server.on('upgrade', (request, socket, head) => {
   });
 });
 
-// Start scheduler service
+// Start scheduler
 require('./services/schedulerService').start();
