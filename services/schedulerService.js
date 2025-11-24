@@ -10,6 +10,7 @@ class SchedulerService {
   start() {
     if (this.isRunning) return;
 
+    // Проверяем сообщения каждую минуту
     cron.schedule('* * * * *', async () => {
       await this.checkScheduledMessages();
     });
@@ -20,11 +21,17 @@ class SchedulerService {
 
   async checkScheduledMessages() {
     try {
-      const messages = await Message.findDueMessages();
+      const now = new Date();
+      const messages = await Message.find({
+        status: 'scheduled',
+        scheduledFor: { $lte: now }
+      });
+
       console.log(`🔍 Found ${messages.length} messages to send`);
 
       for (const message of messages) {
         await this.sendMessage(message);
+        // Задержка между отправками
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     } catch (error) {
