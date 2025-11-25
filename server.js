@@ -394,6 +394,40 @@ app.get('/api/debug/all-messages', (req, res) => {
   });
 });
 
+app.post('/api/debug/check-chat', async (req, res) => {
+  const { chatId } = req.body;
+  
+  if (!chatId) {
+    return res.status(400).json({
+      success: false,
+      error: 'chatId required'
+    });
+  }
+
+  console.log(`🔍 Проверка чата: ${chatId}`);
+  
+  try {
+    const url = `https://api.telegram.org/bot${CONFIG.TELEGRAM_BOT_TOKEN}/getChat`;
+    const response = await axios.post(url, {
+      chat_id: chatId
+    }, {
+      timeout: 5000
+    });
+
+    res.json({
+      success: true,
+      chat: response.data.result
+    });
+  } catch (error) {
+    console.log('❌ Ошибка проверки чата:', error.response?.data);
+    res.json({
+      success: false,
+      error: error.response?.data?.description || error.message,
+      code: error.response?.data?.error_code
+    });
+  }
+});
+
 app.get('/api/debug/telegram-status', async (req, res) => {
   const status = await telegramService.checkBotStatus();
   
